@@ -1,0 +1,45 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile information",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email"]
+    },
+    "Brand": {
+      "title": "Brand",
+      "description": "Generated brand assets",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "businessIdea": { "type": "string" },
+        "brandNames": { "type": "array", "items": { "type": "string" } },
+        "taglines": { "type": "array", "items": { "type": "string" } },
+        "description": { "type": "string" },
+        "logoPrompt": { "type": "string" },
+        "logoUrl": { "type": "string" },
+        "socialMediaCaption": { "type": "string" },
+        "toneAnalysis": { "type": "object" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "businessIdea", "brandNames", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profile data"
+    },
+    "/users/{userId}/brands/{brandId}": {
+      "schema": "Brand",
+      "description": "User generated brands"
+    }
+  }
+}

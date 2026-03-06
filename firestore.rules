@@ -1,0 +1,127 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: userId (UID)
+    // Fields:
+    //   - uid: string (required)
+    //   - email: string (required, email format)
+    //   - displayName: string (optional)
+    //   - photoURL: string (optional)
+    //   - createdAt: timestamp (required)
+    //
+    // Collection: users/{userId}/brands
+    // Document ID: auto-generated
+    // Fields:
+    //   - userId: string (required)
+    //   - businessIdea: string (required)
+    //   - brandNames: list (required)
+    //   - taglines: list (required)
+    //   - description: string (required)
+    //   - logoPrompt: string (required)
+    //   - logoUrl: string (optional)
+    //   - socialMediaCaption: string (required)
+    //   - toneAnalysis: map (required)
+    //   - createdAt: timestamp (required)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+          (request.auth.token.email == "polamnandhini5@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidUrl(url) {
+      return url is string && (url.matches("^https://.*") || url.matches("^http://.*"));
+    }
+
+    function isRecent(time) {
+      return time > request.time - duration.value(5, 'm') && time <= request.time;
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidUserCreate(data) {
+      return data.keys().hasAll(['uid', 'email', 'createdAt']) &&
+             data.uid == request.auth.uid &&
+             isValidEmail(data.email) &&
+             data.createdAt is timestamp &&
+             isRecent(data.createdAt);
+    }
+
+    function isValidUserUpdate(data) {
+      return data.keys().hasAll(['uid', 'email', 'createdAt']) &&
+             data.uid == request.auth.uid &&
+             isValidEmail(data.email) &&
+             data.createdAt is timestamp &&
+             data.createdAt == resource.data.createdAt;
+    }
+
+    function isValidBrandCreate(data) {
+      return data.keys().hasAll(['userId', 'businessIdea', 'brandNames', 'taglines', 'description', 'logoPrompt', 'socialMediaCaption', 'toneAnalysis', 'createdAt']) &&
+             data.userId == request.auth.uid &&
+             data.brandNames is list && data.brandNames.size() <= 10 &&
+             data.taglines is list && data.taglines.size() <= 10 &&
+             data.description is string && data.description.size() <= 5000 &&
+             data.logoPrompt is string && data.logoPrompt.size() <= 2000 &&
+             data.createdAt is timestamp &&
+             isRecent(data.createdAt);
+    }
+
+    function isValidBrandUpdate(data) {
+      return data.keys().hasAll(['userId', 'businessIdea', 'brandNames', 'taglines', 'description', 'logoPrompt', 'socialMediaCaption', 'toneAnalysis', 'createdAt']) &&
+             data.userId == request.auth.uid &&
+             data.brandNames is list && data.brandNames.size() <= 10 &&
+             data.taglines is list && data.taglines.size() <= 10 &&
+             data.description is string && data.description.size() <= 5000 &&
+             data.logoPrompt is string && data.logoPrompt.size() <= 2000 &&
+             data.createdAt is timestamp &&
+             data.createdAt == resource.data.createdAt;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId) && isValidUserCreate(request.resource.data);
+      allow update: if isOwner(userId) && isValidUserUpdate(request.resource.data);
+
+      match /brands/{brandId} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow create: if isOwner(userId) && isValidBrandCreate(request.resource.data);
+        allow update: if isOwner(userId) && isValidBrandUpdate(request.resource.data);
+        allow delete: if isOwner(userId) || isAdmin();
+      }
+    }
+
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
