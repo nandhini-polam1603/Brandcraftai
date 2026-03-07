@@ -144,6 +144,8 @@ function BrandCraftApp() {
     }
   };
 
+  const [error, setError] = useState<string | null>(null);
+
   const handleGenerate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!businessIdea.trim() || !user) return;
@@ -151,6 +153,7 @@ function BrandCraftApp() {
     setIsLoading(true);
     setAssets(null);
     setLogoUrl(null);
+    setError(null);
 
     try {
       const generatedAssets = await generateBrandAssets(businessIdea);
@@ -169,9 +172,21 @@ function BrandCraftApp() {
         userId: user.uid,
         createdAt: Timestamp.now()
       });
-    } catch (error) {
-      console.error("Generation failed:", error);
-      handleFirestoreError(error, OperationType.WRITE, `users/${user?.uid}/brands`);
+    } catch (err: any) {
+      console.error("Generation failed:", err);
+      let errorMessage = err.message || "An unexpected error occurred.";
+      
+      if (err.message?.includes("API_KEY_INVALID")) {
+        errorMessage = "Invalid Gemini API Key. Please check your .env file and ensure the key is correct.";
+      } else if (err.message?.includes("quota")) {
+        errorMessage = "API Quota exceeded. You may have reached the free tier limit. Please try again later.";
+      } else if (err.message?.includes("not found")) {
+        errorMessage = "Gemini API Key not found. Ensure VITE_GEMINI_API_KEY is set in your .env file and you have restarted the server.";
+      } else if (err.message?.includes("model")) {
+        errorMessage = `Model error: ${err.message}. The selected AI model might not be available in your region or for your API key.`;
+      }
+      
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
       setIsGeneratingLogo(false);
@@ -347,6 +362,17 @@ function BrandCraftApp() {
               >
                 Turn your business idea into a complete brand identity. Names, taglines, logos, and content—all powered by advanced Generative AI.
               </motion.p>
+
+              {error && (
+                <motion.div 
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="mb-8 p-4 bg-red-50 border border-red-100 text-red-600 rounded-2xl text-sm font-medium flex items-center gap-3 justify-center"
+                >
+                  <div className="w-2 h-2 bg-red-600 rounded-full animate-pulse" />
+                  {error}
+                </motion.div>
+              )}
 
               <motion.form 
                 initial={{ opacity: 0, y: 20 }}
